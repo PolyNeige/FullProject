@@ -1,0 +1,12 @@
+[submodule "PlatformModule"]
+	path = PlatformModule
+	url = git@github.com:PolyNeige/PlatformModule.git
+[submodule "AvroRepo"]
+	path = AvroRepo
+	url = git@github.com:PolyNeige/AvroRepo.git
+[submodule "Editor"]
+	path = Editor
+	url = git@github.com:PolyNeige/Editor.git
+[submodule "PlayerModule"]
+	path = PlayerModule
+	url = git@github.com:PolyNeige/PlayerModule.git
