@@ -143,6 +143,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db-platform:5432/platform_db
       SPRING_DATASOURCE_USERNAME: platform_user
       SPRING_DATASOURCE_PASSWORD: platform_pass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
       LOGGING_LEVEL_ROOT: OFF            # Mutes all logs (Info, Debug, Warn)
       SPRING_MAIN_BANNER_MODE: "off"     # Hides the startup banner
       LOGGING_PATTERN_CONSOLE: "%msg%n"  # Ensures only raw message output
