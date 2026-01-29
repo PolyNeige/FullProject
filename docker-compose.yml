@@ -59,6 +59,8 @@ services:
       POSTGRES_DB: platform_db
     ports:
       - "5434:5432"
+    volumes:
+      - platform-db-data:/var/lib/postgresql/data
 
   db-player:
     image: postgres:15
@@ -69,6 +71,8 @@ services:
       POSTGRES_DB: player-module-db
     ports:
       - "5435:5432"
+    volumes:
+      - player-db-data:/var/lib/postgresql/data
 
   # Editor Database
   db-editor:
@@ -176,3 +180,5 @@ services:
 volumes:
   kafka-data:
   editor-db-data:
+  player-db-data:
+  platform-db-data:
