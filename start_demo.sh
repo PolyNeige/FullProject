@@ -86,7 +86,7 @@ sed -i 's/\r$//' "$0" 2>/dev/null
 
 clear
 echo "======================================================"
-echo "      STEAM SIMULATION LAUNCHER (FINAL FIX)"
+echo "      STEAM SIMULATION LAUNCHER"
 echo "======================================================"
 
 # 1. Cleanup and Start
