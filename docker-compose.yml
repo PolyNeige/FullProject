@@ -1,5 +1,5 @@
 services:
-  # --- INFRASTRUCTURE (From AvroRepo) ---
+  # --- INFRASTRUCTURE ---
   kafka:
     image: apache/kafka:3.7.0
     container_name: polyneige-kafka
@@ -49,6 +49,38 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+
+
+  # Initialisation des topics kafka (pour éviter les erreurs dues au fait que les listeners écoutent avant la création des topics
+  init-kafka:
+    image: apache/kafka:3.7.0
+    container_name: polyneige-init-kafka
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      # On attend que Kafka soit prêt
+      echo -e '⏳ Waiting for Kafka to be ready...'
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list
+
+      echo -e '🚀 Creating topics...'
+      # Liste de tes topics à créer
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic DLCReleased --replication-factor 1 --partitions 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic SendSessionPlayTime --replication-factor 1 --partitions 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic PatchReleased --replication-factor 1 --partitions 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic ReviewSubmitted --replication-factor 1 --partitions 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic CrashReported --replication-factor 1 --partitions 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic GamePublished --replication-factor 1 --partitions 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic CommentToEditor --replication-factor 1 --partitions 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic CrashReportToEditor --replication-factor 1 --partitions 1
+
+
+
+      echo -e '✅ Topics created!'
+      "
+
   # --- DATABASES ---
   db-platform:
     image: postgres:15
@@ -74,7 +106,6 @@ services:
     volumes:
       - player-db-data:/var/lib/postgresql/data
 
-  # Editor Database
   db-editor:
     image: postgres:15
     container_name: polyneige-editor-db
@@ -104,17 +135,17 @@ services:
         condition: service_healthy
       db-platform:
         condition: service_started
+      init-kafka:
+        condition: service_completed_successfully
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL: http://schema-registry:8081
       SPRING_DATASOURCE_URL: jdbc:postgresql://db-platform:5432/platform_db
       SPRING_DATASOURCE_USERNAME: platform_user
       SPRING_DATASOURCE_PASSWORD: platform_pass
-      # === ADD THESE LINES ===
       LOGGING_LEVEL_ROOT: OFF            # Mutes all logs (Info, Debug, Warn)
       SPRING_MAIN_BANNER_MODE: "off"     # Hides the startup banner
       LOGGING_PATTERN_CONSOLE: "%msg%n"  # Ensures only raw message output
-      # 2. Mute Hibernate/SQL logs (THE FIX FOR YOUR PROBLEM)
       SPRING_JPA_SHOW_SQL: "false"
       SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: "false"
       LOGGING_LEVEL_ORG_HIBERNATE: "OFF"
@@ -132,24 +163,23 @@ services:
         condition: service_healthy
       db-player:
         condition: service_started
+      init-kafka:
+        condition: service_completed_successfully
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL: http://schema-registry:8081
       SPRING_DATASOURCE_URL: jdbc:postgresql://db-player:5432/player-module-db
       SPRING_DATASOURCE_USERNAME: myuser
       SPRING_DATASOURCE_PASSWORD: secret
-      # === ADD THESE LINES ===
       LOGGING_LEVEL_ROOT: OFF            # Mutes all logs (Info, Debug, Warn)
       SPRING_MAIN_BANNER_MODE: "off"     # Hides the startup banner
       LOGGING_PATTERN_CONSOLE: "%msg%n"  # Ensures only raw message output
-      # 2. Mute Hibernate/SQL logs (THE FIX FOR YOUR PROBLEM)
       SPRING_JPA_SHOW_SQL: "false"
       SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: "false"
       LOGGING_LEVEL_ORG_HIBERNATE: "OFF"
       LOGGING_LEVEL_ORG_HIBERNATE_SQL: "OFF"
       LOGGING_LEVEL_ORG_HIBERNATE_TYPE_DESCRIPTOR_SQL: "OFF"
 
-  # NEW: Editor Module
   editor-module:
     build:
       context: ./Editor
@@ -161,6 +191,8 @@ services:
         condition: service_healthy
       db-editor:
         condition: service_healthy
+      init-kafka:
+        condition: service_completed_successfully
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL: http://schema-registry:8081

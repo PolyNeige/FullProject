@@ -118,9 +118,9 @@ echo "[3/3] Opening Windows..."
 
 # On lance les fenêtres avec un petit délai
 open_terminal "PLAYER (CLIENT)" "docker attach $PLAYER_CONTAINER"
-sleep 1
+sleep 2
 open_terminal "PLATFORM (ADMIN)" "docker attach $PLATFORM_CONTAINER"
-sleep 1
+sleep 2
 open_terminal "EDITOR (PUBLISHER)" "docker attach $EDITOR_CONTAINER"
 
 echo ""
