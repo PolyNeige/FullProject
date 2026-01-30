@@ -4,8 +4,6 @@ Ce projet fonctionne comme un **"Monorepo"** utilisant des **Git Submodules**. C
 
 **⚠️ À lire absolument pour éviter les dossiers vides ou les conflits !**
 
-Si vous avez récupéré ce projet via un .zip qui contient donc déjà tout le projet, allez voir la section Lancement du projet.
-
 ## 1. Récupérer le projet (Clone)
 
 Il y a deux façons de faire, selon si vous avez déjà cloné ou non.
