@@ -62,8 +62,15 @@ services:
     command: |
       "
       # On attend que Kafka soit prêt
-      echo -e '⏳ Waiting for Kafka to be ready...'
-      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list
+      echo '⏳ Waiting for Kafka to be fully ready...'
+      # On essaie de lister les topics. Si ça plante ou timeout, on attend 1s et on recommence.
+      # Le 'timeout 5s' empêche la commande de rester bloquée 30s si Kafka ne répond pas.
+      until timeout 5s /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list; do
+        echo 'zzz... Kafka not ready yet'
+        sleep 2
+      done
+
+      echo '🚀 Kafka is ready! Creating topics...'
 
       echo -e '🚀 Creating topics...'
       # Liste de tes topics à créer

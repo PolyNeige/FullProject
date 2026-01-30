@@ -5,83 +5,86 @@ PLAYER_CONTAINER="player-app"
 PLATFORM_CONTAINER="platform-app"
 EDITOR_CONTAINER="editor-app"
 
-# --- FONCTION DE DETECTION INTELLIGENTE ---
+# --- 1. GÉNÉRATEUR DE COMMANDE ROBUSTE ---
+# Cette fonction crée la chaîne de commande "Infinie" pour éviter que la fenêtre ne ferme
+get_robust_command() {
+    local title="$1"
+    local container="$2"
+
+    # On retourne une chaîne BASH complexe qui sera exécutée dans le nouveau terminal
+    echo "echo -e '\033[1;34m=== $title ===\033[0m'; \
+    while true; do \
+        docker attach $container; \
+        echo -e '\033[1;31m⚠️ Déconnecté (ou conteneur pas prêt). Reconnexion dans 3s...\033[0m'; \
+        sleep 3; \
+    done; \
+    read -p 'Appuyez sur Entrée pour fermer...'"
+}
+
+# --- 2. FONCTION D'OUVERTURE DE TERMINAL ---
 open_terminal() {
     local title="$1"
     local command="$2"
 
-    # 1. WINDOWS (Git Bash / WSL)
+    # A. WINDOWS
     if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WSL_DISTRO_NAME" ]]; then
         cmd.exe /c start "$title" cmd /k "$command"
         return
     fi
 
-    # 2. MACOS
+    # B. MACOS
     if [[ "$OSTYPE" == "darwin"* ]]; then
         osascript -e "tell application \"Terminal\" to do script \"$command\""
         return
     fi
 
-    # 3. LINUX (Liste de priorités)
-    # On teste les commandes courantes sur Fedora/Bazzite/Ubuntu
-    # "gnome-terminal" = Le classique
-    # "kgx" = GNOME Console (souvent appelé juste "Terminal" dans les versions récentes)
-    # "flatpak run..." = Si c'est installé via le centre logiciel
-    local terms=("gnome-terminal" "kgx" "console" "ptyxis" "konsole" "xfce4-terminal" "xterm" "flatpak run org.gnome.Terminal" "flatpak run org.gnome.Console")
+    # C. LINUX
+    # On enlève 'setsid' qui casse le lien avec Wayland sur Bazzite
+    local terms=("ptyxis" "kgx" "gnome-console" "gnome-terminal" "konsole" "xfce4-terminal" "xterm" "flatpak run org.gnome.Terminal")
 
-    # Si l'utilisateur a déjà donné une commande perso (voir fin de fonction), on l'utilise
     if [ -n "$USER_CHOSEN_TERM" ]; then
         terms=("$USER_CHOSEN_TERM")
     fi
 
     for t in "${terms[@]}"; do
-        # Astuce pour vérifier si la commande existe (gère les espaces pour flatpak)
         check_cmd=$(echo "$t" | awk '{print $1}')
 
         if command -v "$check_cmd" &> /dev/null; then
-            # On a trouvé un terminal compatible !
+
+            # --- CORRECTION MAJEURE ICI ---
+            # 1. On utilise 'nohup' pour que le terminal survive à la fin du script
+            # 2. On redirige tout vers /dev/null
+            # 3. On met '&' pour le background
+            # 4. On ajoute 'disown' pour détacher proprement le process du shell actuel
+
             case "$t" in
                 gnome-terminal|mate-terminal|tilix|"flatpak run org.gnome.Terminal")
-                    "$t" --title="$title" -- bash -c "$command" &
-                    ;;
-                kgx|console|"flatpak run org.gnome.Console")
-                    # GNOME Console (kgx) est capricieux sur les arguments
-                    "$t" -- bash -c "$command" &
+                    nohup "$t" --title="$title" -- bash -c "$command" < /dev/null > /dev/null 2>&1 & disown
                     ;;
                 ptyxis)
-                    "$t" --new-window -- bash -c "$command" &
+                    # Ptyxis a besoin de --new-window explicitement pour ne pas bugger en multi-launch
+                    nohup "$t" --new-window --title "$title" -- bash -c "$command" < /dev/null > /dev/null 2>&1 & disown
+                    ;;
+                kgx|console|gnome-console|"flatpak run org.gnome.Console")
+                    nohup "$t" -- bash -c "$command" < /dev/null > /dev/null 2>&1 & disown
                     ;;
                 konsole)
-                    "$t" -e bash -c "$command" &
+                    nohup "$t" -e bash -c "$command" < /dev/null > /dev/null 2>&1 & disown
                     ;;
                 *)
-                    # Tentative générique
-                    "$t" -e "$command" &
+                    nohup "$t" -e "$command" < /dev/null > /dev/null 2>&1 & disown
                     ;;
             esac
-            USER_CHOSEN_TERM="$check_cmd" # On mémorise pour les prochaines fenêtres
+            
+            USER_CHOSEN_TERM="$check_cmd"
             return
         fi
     done
 
-    # 4. ÉCHEC : ON DEMANDE A L'UTILISATEUR
-    echo ""
-    echo "[⚠️] Je ne trouve pas votre terminal automatiquement."
-    echo "Quel est la commande pour lancer votre terminal ? (ex: gnome-terminal, kgx, alacritty...)"
-    read -p "> " USER_INPUT
-
-    if [ -n "$USER_INPUT" ]; then
-        USER_CHOSEN_TERM="$USER_INPUT"
-        # On relance la fonction avec la commande fournie par l'utilisateur
-        open_terminal "$title" "$command"
-        return
-    else
-        echo "[ERROR] Abandon. Veuillez lancer : $command"
-    fi
+    echo "⚠️ Echec lancement terminal pour $title"
 }
 
 # --- DÉBUT DU SCRIPT ---
-# Nettoyage automatique des retours à la ligne Windows (CRLF)
 sed -i 's/\r$//' "$0" 2>/dev/null
 
 clear
@@ -102,26 +105,26 @@ fi
 
 # 2. Wait Loop
 echo ""
-echo "[2/3] Waiting for apps to be ready..."
-until [ "$(docker inspect -f {{.State.Running}} $EDITOR_CONTAINER 2>/dev/null)" == "true" ]; do
-    echo -n "."
-    sleep 1
-done
-
-echo ""
-echo "Apps are running. Waiting 5s for Java..."
+echo "[2/3] Waiting for apps..."
+# On attend un peu que Kafka/Postgres soient chauds
 sleep 5
 
 # 3. Launch Terminals
 echo ""
 echo "[3/3] Opening Windows..."
 
-# On lance les fenêtres avec un petit délai
-open_terminal "PLAYER (CLIENT)" "docker attach $PLAYER_CONTAINER"
-sleep 2
-open_terminal "PLATFORM (ADMIN)" "docker attach $PLATFORM_CONTAINER"
-sleep 2
-open_terminal "EDITOR (PUBLISHER)" "docker attach $EDITOR_CONTAINER"
+# On construit la commande robuste pour chaque module
+CMD_PLAYER=$(get_robust_command "PLAYER (CLIENT)" "$PLAYER_CONTAINER")
+CMD_PLATFORM=$(get_robust_command "PLATFORM (ADMIN)" "$PLATFORM_CONTAINER")
+CMD_EDITOR=$(get_robust_command "EDITOR (PUBLISHER)" "$EDITOR_CONTAINER")
 
-echo ""
-echo "Done."
+# On lance !
+open_terminal "PLAYER" "$CMD_PLAYER"
+sleep 1
+
+open_terminal "PLATFORM" "$CMD_PLATFORM"
+sleep 1
+
+open_terminal "EDITOR" "$CMD_EDITOR"
+
+echo "✅ Done."
