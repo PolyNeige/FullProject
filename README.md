@@ -4,6 +4,8 @@ Ce projet fonctionne comme un **"Monorepo"** utilisant des **Git Submodules**. C
 
 **⚠️ À lire absolument pour éviter les dossiers vides ou les conflits !**
 
+Si vous avez récupéré ce projet via un .zip qui contient donc déjà tout le projet, allez voir la section Lancement du projet.
+
 ## 1. Récupérer le projet (Clone)
 
 Il y a deux façons de faire, selon si vous avez déjà cloné ou non.
@@ -52,8 +54,6 @@ cat ~/.ssh/id_ed25519.pub
 3. Copiez tout le texte affiché.
 4. Allez sur GitHub : **Settings > SSH and GPG keys > New SSH key** et collez la clé.
 
-*(Note pour Linux/KDE : Si vous avez une erreur `ksshaskpass`, faites `unset SSH_ASKPASS` dans le terminal).*
-
 ---
 
 ## 3. Workflow de développement (La Règle d'Or)
@@ -96,11 +96,29 @@ Si IntelliJ vous affiche une erreur *"The following directories are registered a
 
 ---
 
-## 🐳 Lancement de l'Infrastructure
-Pour démarrer Kafka et les Bases de Données :
-1. `docker compose up -d` (Lancement) (-d optionnel, fait tourner tout en arrière plan)
-2. `docker compose ps` (Vérification)
-3. `docker compose down` (Arrêt)
+## 🐳 Lancement du projet
+
+Le projet est composé de 3 modules qui sont lancés indépendamment et liés avec Kafka sur Docker.
+
+Pour lancer le projet, allez dans le répertoire du projet (`/FullProject`).
+
+Tout d'abord, utilisez `mvn clean generate-sources` afin de générer les classes liées aux fichiers Avro.
+
+Exécutez ensuite le script shell nommé start_demo.sh (`./start_demo.sh`)
+
+Normalement, ce script se charge de lancer le docker et les différents modules et d'ouvrir un terminal par module pour que l'utilisateur puisse utiliser l'application.
+
+Le lancement et l'initialisation du projet la première fois est très long (cela peut durer environ 10 minutes), et c'est normal, car il doit télécharger les dépendances pour chaque module.
+
+De plus, le lancement classique (sans initialisation des librairies, après la première fois) peut aussi prendre environ une minute à cause de l'initialisation du Kafka.
+
+Faites attention cependant à bien vider votre docker avant d'exécuter cette fonction, car cela ne marchera pas si vous utilisez déjà les ports que nous utilisons.
+
+Nous avons également rencontré des problèmes de terminaux qui crashent à l'ouverture. Nous n'avons pas de solution définitive à ce problème, mais si cela arrive, nous vous suggère tout d'abord d'essayer de relancer le script,
+et si cela ne fonctionne toujours pas, faites `docker compose down -v`, cela nettoiera la base de donnée, mais le retour à 0 règle parfois le problème des terminaux.
+
+Si vous récupérez le projet via github, faites attention à bien être situé sur les bonnes branches. Les branches les plus à jour sont les branches main ou master de chaque module. La branche sur laquelle le projet récupère les données est modifiable sur intelliJ depuis l'onglet git.
+
 
 ---
 
